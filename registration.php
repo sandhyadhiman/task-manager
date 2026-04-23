@@ -42,7 +42,7 @@ if(isset($_POST['register'])){
 <body>
 
 <div class="container">
-    <h2>📝 Register</h2>
+    <h2> Register</h2>
 
     <?php if($msg != ""): ?>
         <div class="alert <?php echo $msg_type; ?>"><?php echo $msg; ?></div>
@@ -56,7 +56,7 @@ if(isset($_POST['register'])){
     </form>
 
     <br>
-    <a href="login.php">👉 Already have account? Login</a>
+    <a href="login.php"> Already have account? Login</a>
 </div>
 
 </body>
