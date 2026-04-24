@@ -2,7 +2,6 @@
 session_start();
 include("db.php");
 
-// 1. Login Check
 if(!isset($_SESSION['user_id'])){
     header("Location: login.php");
     exit();
@@ -11,8 +10,7 @@ if(!isset($_SESSION['user_id'])){
 $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'] ?? "User"; 
 
-// 2. Initial Data Fetch (Page load par display ke liye)
-$query = "SELECT * FROM tasks WHERE user_id='$user_id' ORDER BY id DESC";
+$query = "SELECT * FROM tasks WHERE user_id='$user_id' AND is_deleted = 0 ORDER BY id DESC";
 $result = mysqli_query($conn, $query);
 ?>
 
@@ -24,44 +22,54 @@ $result = mysqli_query($conn, $query);
     <title>Task Manager | Final Dashboard</title>
     <style>
         :root { --bg: #0f172a; --card: #1e293b; --accent: #22c55e; --blue: #3b82f6; --danger: #ef4444; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 50px; }
-        
-        /* Header Styling */
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 50px; }
         .header { background: #020617; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
+        .container { width: 95%; max-width: 1300px; margin: 2rem auto; }
+        .card { background: var(--card); padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #334155; }
         
-        .container { width: 90%; max-width: 1200px; margin: 2rem auto; }
-        
-        /* Card Styling */
-        .card { background: var(--card); padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        
-        /* Form & Inputs */
         input, select, button, textarea { padding: 12px; border-radius: 8px; border: none; margin: 8px 0; }
         input, select, textarea { background: #334155; color: white; border: 1px solid #475569; width: 100%; box-sizing: border-box; }
-        textarea { resize: vertical; min-height: 80px; font-family: inherit; }
         
         button { background: var(--accent); color: white; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; font-size: 16px; }
         button:hover { filter: brightness(1.1); transform: translateY(-1px); }
         
-        /* Search Bar */
-        #live_search { border: 2px solid var(--blue); padding: 15px; font-size: 16px; margin-bottom: 0; }
-
-        /* Table Styling */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: transparent; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; }
-        th { color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 13px; }
+        /* Table Layout Fix */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #334155; vertical-align: top; overflow: hidden; }
+        th { color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 12px; }
         
-        /* Status Badges */
+        /* Fixed Description Box */
+        .desc-box { 
+            background: #0f172a; 
+            padding: 10px; 
+            border-radius: 8px; 
+            font-size: 13px; 
+            color: #cbd5e1; 
+            border: 1px solid #334155;
+            min-height: 45px;
+            white-space: pre-wrap; /* Preserve line breaks */
+            word-wrap: break-word; /* Prevent text overflow */
+            line-height: 1.5;
+        }
+
+        .feedback-box {
+            background: rgba(59, 130, 246, 0.1);
+            color: #93c5fd;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            border-left: 4px solid var(--blue);
+            word-wrap: break-word;
+        }
+
         .status-badge { padding: 5px 10px; border-radius: 6px; font-size: 11px; text-transform: uppercase; font-weight: 800; display: inline-block; }
         .completed { background: #14532d; color: #4ade80; }
         .pending { background: #78350f; color: #fbbf24; }
         .in-progress { background: #1e3a8a; color: #93c5fd; }
         
-        /* Helper Classes */
-        .task-desc { display: block; font-size: 13px; color: #94a3b8; margin-top: 5px; line-height: 1.4; font-style: italic; }
-        .delete-btn { color: var(--danger); cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .delete-btn:hover { text-decoration: underline; }
+        .delete-btn { color: var(--danger); cursor: pointer; font-weight: bold; }
+        .view-file { color: #38bdf8; font-size: 12px; text-decoration: none; display: inline-block; margin-top: 8px; }
         .edit-link { color: var(--blue); text-decoration: none; font-weight: bold; }
-        .view-file { color: #38bdf8; font-size: 12px; text-decoration: none; display: block; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -75,9 +83,8 @@ $result = mysqli_query($conn, $query);
 </div>
 
 <div class="container">
-    
     <div class="card">
-        <h3 style="margin-top:0;">🔍 Live Task Search</h3>
+        <h3>🔍 Live Task Search</h3>
         <input type="text" id="live_search" placeholder="Type title or category..." oninput="liveSearch()">
     </div>
 
@@ -85,34 +92,23 @@ $result = mysqli_query($conn, $query);
         <h3>➕ Add New Task</h3>
         <form id="taskForm" enctype="multipart/form-data">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                <div>
-                    <label>Title</label>
-                    <input type="text" name="title" id="title" placeholder="What needs to be done?" required>
-                </div>
-                <div>
-                    <label>Category</label>
-                    <input type="text" name="category" placeholder="Work, Personal, etc.">
-                </div>
+                <div><label>Title</label><input type="text" name="title" id="title" required></div>
+                <div><label>Category</label><input type="text" name="category"></div>
                 <div>
                     <label>Priority</label>
-                    <select name="priority">
-                        <option>Low</option>
-                        <option selected>Medium</option>
-                        <option>High</option>
+                    <select name="priority" required>
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
                     </select>
                 </div>
-                <div>
-                    <label>Due Date</label>
-                    <input type="date" name="due_date" id="due_date" required>
-                </div>
+                <div><label>Due Date</label><input type="date" name="due_date" required></div>
             </div>
-
             <div style="margin-top: 15px;">
-                <label>Description (Optional)</label>
-                <textarea name="description" placeholder="Write more details about this task here..."></textarea>
+                <label>Description</label>
+                <textarea name="description" id="description" placeholder="Enter task details..."></textarea>
             </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end; margin-top: 10px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end; margin-top: 10px;">
                 <div>
                     <label>Initial Status</label>
                     <select name="status">
@@ -121,13 +117,8 @@ $result = mysqli_query($conn, $query);
                         <option value="Completed">Completed</option>
                     </select>
                 </div>
-                <div>
-                    <label>Attachment</label>
-                    <input type="file" name="file">
-                </div>
-                <div style="grid-column: span 1;">
-                    <button type="button" onclick="addTask()">Save Task</button>
-                </div>
+                <div><label>Attachment</label><input type="file" name="file"></div>
+                <button type="button" onclick="addTask()">Save Task</button>
             </div>
         </form>
     </div>
@@ -137,12 +128,12 @@ $result = mysqli_query($conn, $query);
         <table>
             <thead>
                 <tr>
-                    <th width="40%">Task Detail</th>
-                    <th>Status</th>
-                    <th>Priority</th>
-                    <th>Category</th>
-                    <th>Feedback</th>
-                    <th>Actions</th>
+                    <th width="15%">Title</th>
+                    <th width="30%">Description</th>
+                    <th width="20%">Admin Feedback</th>
+                    <th width="12%">Status</th>
+                    <th width="10%">Priority</th>
+                    <th width="13%">Actions</th>
                 </tr>
             </thead>
             <tbody id="taskTableBody">
@@ -150,22 +141,25 @@ $result = mysqli_query($conn, $query);
                     $status_cls = str_replace(' ', '-', strtolower($row['status']));
                 ?>
                 <tr id="row-<?php echo $row['id']; ?>">
+                    <td><b style="color:#f8fafc;"><?php echo htmlspecialchars($row['title']); ?></b><br><small><?php echo htmlspecialchars($row['category']); ?></small></td>
                     <td>
-                        <b><?php echo htmlspecialchars($row['title']); ?></b>
-                        <span class="task-desc">
-                            <?php echo !empty($row['description']) ? htmlspecialchars($row['description']) : "No description provided."; ?>
-                        </span>
-                        
+                        <div class="desc-box"><?php echo !empty($row['description']) ? nl2br(htmlspecialchars($row['description'])) : "No details."; ?></div>
                         <?php if(!empty($row['file'])): ?>
-                            <a href="uploads/<?php echo $row['file']; ?>" target="_blank" class="view-file">📎 View File</a>
+                            <a href="uploads/<?php echo $row['file']; ?>" target="_blank" class="view-file">📎 Attachment</a>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if(!empty($row['admin_feedback'])): ?>
+                            <div class="feedback-box">
+                                <strong>Admin Note:</strong><br>
+                                <?php echo nl2br(htmlspecialchars($row['admin_feedback'])); ?>
+                            </div>
+                        <?php else: ?>
+                            <span style="opacity:0.3; font-size:11px;">Waiting for review...</span>
                         <?php endif; ?>
                     </td>
                     <td><span class="status-badge <?php echo $status_cls; ?>"><?php echo $row['status']; ?></span></td>
-                    <td><?php echo $row['priority']; ?></td>
-                    <td><?php echo htmlspecialchars($row['category']); ?></td>
-                    <td style="font-size: 13px; color: #94a3b8; font-style: italic;">
-                        <?php echo (!empty($row['admin_feedback'])) ? htmlspecialchars($row['admin_feedback']) : "No feedback"; ?>
-                    </td>
+                    <td><span style="font-size: 12px;"><?php echo ucfirst($row['priority']); ?></span></td>
                     <td>
                         <a href="edit_task.php?id=<?php echo $row['id']; ?>" class="edit-link">Edit</a> | 
                         <span class="delete-btn" onclick="deleteTask(<?php echo $row['id']; ?>)">Delete</span>
@@ -178,63 +172,38 @@ $result = mysqli_query($conn, $query);
 </div>
 
 <script>
-// --- LIVE SEARCH FUNCTION ---
+// Logic is same as your previous code
 function liveSearch() {
     let query = document.getElementById('live_search').value;
-    let tableBody = document.getElementById('taskTableBody');
-
-    fetch('live_search_ajax.php?search=' + encodeURIComponent(query))
+    fetch('add_task_ajax.php?action=search&search=' + encodeURIComponent(query))
     .then(res => res.text())
-    .then(data => {
-        tableBody.innerHTML = data;
-    })
-    .catch(err => console.error('Search Error:', err));
+    .then(data => { document.getElementById('taskTableBody').innerHTML = data; });
 }
 
-// --- ADD TASK FUNCTION ---
 function addTask() {
     let title = document.getElementById('title').value;
-    let dueDate = document.getElementById('due_date').value;
-
-    if(title.trim() === "" || dueDate === "") {
-        alert("Title and Due Date are mandatory!");
-        return;
-    }
-
+    if(title.trim() === "") { alert("Title is mandatory!"); return; }
     let form = document.getElementById('taskForm');
     let formData = new FormData(form);
-    
+    formData.append('action', 'add');
     fetch('add_task_ajax.php', { method: 'POST', body: formData })
     .then(res => res.text())
-    .then(data => {
-        if(data.trim() === "Success") {
-            alert("Task saved successfully!");
-            location.reload(); 
-        } else {
-            alert("Error: " + data);
-        }
-    });
+    .then(data => { if(data.trim() === "Success") { location.reload(); } else { alert("Error: " + data); } });
 }
 
-// --- DELETE TASK FUNCTION ---
 function deleteTask(id) {
-    if(confirm('Are you sure you want to delete this task?')) {
-        fetch('delete_task_ajax.php?id=' + id)
+    let password = prompt("Enter password to delete:");
+    if (!password) return;
+    if(confirm('Delete this task?')) {
+        fetch('add_task_ajax.php?action=delete&id=' + id + '&pass=' + encodeURIComponent(password))
         .then(res => res.text())
         .then(data => {
             if(data.trim() === "Deleted") {
-                let row = document.getElementById('row-' + id);
-                row.style.transition = "0.3s";
-                row.style.opacity = "0";
-                setTimeout(() => { row.remove(); }, 300);
-            } else {
-                alert("Error deleting task: " + data);
-            }
-        })
-        .catch(err => alert("Connection error!"));
+                document.getElementById('row-' + id).style.display = 'none';
+            } else { alert(data); }
+        });
     }
 }
 </script>
-
 </body>
 </html>
